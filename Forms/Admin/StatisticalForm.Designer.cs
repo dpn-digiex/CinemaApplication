@@ -109,6 +109,11 @@
             lblMostPopularSeatTypePeriodValue = new Label();
             lblMostPopularMoviePeriodText = new Label();
             lblMostPopularMoviePeriodValue = new Label();
+            lblTotalTicketRevenueValue = new System.Windows.Forms.Label();
+            lblFoodRevenueValue = new System.Windows.Forms.Label();
+            lblTotalOrdersRevenueValue = new System.Windows.Forms.Label();
+            lblMostPopularSeatTypeValue = new System.Windows.Forms.Label();
+            lblMostPopularMovieValue = new System.Windows.Forms.Label();
             tabControlMainStats.SuspendLayout();
             tabPageInfrastructure.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvSeatTypePhysicalStats).BeginInit();

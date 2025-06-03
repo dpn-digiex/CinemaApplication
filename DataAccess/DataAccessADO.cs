@@ -1465,15 +1465,17 @@ namespace CinemaApplication.DataAccess
         }
         public RevenueDetailsStat GetRevenueDetailsForPeriod(DateTime startDate, DateTime endDate)
         {
-            AppUtils.WriteLine($"[ADO.NET] Getting revenue details for period: {startDate:d} - {endDate:d}");
+            AppUtils.WriteLine($"[ADO.NET] GetRevenueDetailsForPeriod called for: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}.");
             RevenueDetailsStat stats = new RevenueDetailsStat();
-            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            DateTime endDatePlusOne = endDate.Date.AddDays(1); // Để bao gồm toàn bộ ngày endDate
+
             try
             {
                 using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    // Doanh thu vé
+
+                    // --- Doanh thu vé ---
                     string ticketQuery = @"
                         SELECT SUM(t.price_at_purchase) 
                         FROM Tickets t
@@ -1487,9 +1489,10 @@ namespace CinemaApplication.DataAccess
                         command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
                         object result = command.ExecuteScalar();
                         stats.TicketRevenue = result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                        AppUtils.WriteLine($"[ADO.NET] Raw TicketRevenue from DB: {result}, Parsed: {stats.TicketRevenue}");
                     }
 
-                    // Doanh thu đồ ăn
+                    // --- Doanh thu đồ ăn ---
                     string foodQuery = @"
                         SELECT SUM(ofi.subtotal_for_item) 
                         FROM OrderFoodItems ofi
@@ -1502,9 +1505,10 @@ namespace CinemaApplication.DataAccess
                         command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
                         object result = command.ExecuteScalar();
                         stats.FoodAndBeverageRevenue = result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                        AppUtils.WriteLine($"[ADO.NET] Raw FoodAndBeverageRevenue from DB: {result}, Parsed: {stats.FoodAndBeverageRevenue}");
                     }
 
-                    // Tổng doanh thu từ bảng Orders (SUM(total_amount))
+                    // --- Tổng doanh thu từ bảng Orders (SUM(total_amount)) ---
                     string orderSumQuery = @"
                         SELECT SUM(o.total_amount) 
                         FROM Orders o
@@ -1516,10 +1520,17 @@ namespace CinemaApplication.DataAccess
                         command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
                         object result = command.ExecuteScalar();
                         stats.TotalOrderSumRevenue = result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                        AppUtils.WriteLine($"[ADO.NET] Raw TotalOrderSumRevenue from DB: {result}, Parsed: {stats.TotalOrderSumRevenue}");
                     }
                 }
             }
-            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetRevenueDetailsForPeriod (ADO.NET): {ex.Message}"); }
+            catch (Exception ex)
+            {
+                AppUtils.WriteLine($"EXCEPTION in GetRevenueDetailsForPeriod (ADO.NET): {ex.GetType().FullName} - {ex.Message}\nStackTrace: {ex.StackTrace}");
+                // Trả về stats với giá trị 0 nếu có lỗi để tránh null reference trên UI
+                return new RevenueDetailsStat();
+            }
+            AppUtils.WriteLine($"[ADO.NET] GetRevenueDetailsForPeriod returning: Ticket={stats.TicketRevenue}, Food={stats.FoodAndBeverageRevenue}, TotalOrderSum={stats.TotalOrderSumRevenue}");
             return stats;
         }
 

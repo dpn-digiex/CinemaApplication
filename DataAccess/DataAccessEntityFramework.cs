@@ -882,31 +882,56 @@ namespace CinemaApplication.DataAccess
 
         public RevenueDetailsStat GetRevenueDetailsForPeriod(DateTime startDate, DateTime endDate)
         {
-            AppUtils.WriteLine($"[EF Core] Getting revenue details for period: {startDate:d} - {endDate:d}");
-            var stats = new RevenueDetailsStat();
+            AppUtils.WriteLine($"[EF Core] GetRevenueDetailsForPeriod called for: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}.");
+            var stats = new RevenueDetailsStat(); // Khởi tạo để luôn trả về một đối tượng
             DateTime endDatePlusOne = endDate.Date.AddDays(1);
             try
             {
                 using (var context = CreateContext())
                 {
-                    var validOrders = context.Orders
+                    // Lấy danh sách các đơn hàng hợp lệ trước
+                    var validOrdersQuery = context.Orders
                         .Where(o => (o.Status == "paid" || o.Status == "completed") &&
                                     o.OrderDateTime >= startDate.Date && o.OrderDateTime < endDatePlusOne);
 
-                    stats.TicketRevenue = validOrders
-                        .SelectMany(o => o.Tickets) // Giả định OrderModel có ICollection<TicketModel> Tickets
-                        .Where(t => t.Status != "cancelled")
-                        .Sum(t => (decimal?)t.PriceAtPurchase) ?? 0; // Sum có thể trả về null nếu không có item
+                    // Để debug, hãy xem có bao nhiêu đơn hàng hợp lệ
+                    var validOrdersList = validOrdersQuery.ToList(); // Materialize the query
+                    AppUtils.WriteLine($"[EF Core] Found {validOrdersList.Count} valid orders for the period.");
 
-                    stats.FoodAndBeverageRevenue = validOrders
-                        .SelectMany(o => o.OrderFoodItems) // Giả định OrderModel có ICollection<OrderFoodItemModel> OrderFoodItems
-                        .Sum(ofi => (decimal?)ofi.SubtotalForItem) ?? 0;
+                    if (validOrdersList.Any())
+                    {
+                        // Tính toán doanh thu vé
+                        stats.TicketRevenue = validOrdersList
+                            .SelectMany(o => o.Tickets) // Giả định OrderModel có ICollection<TicketModel> Tickets
+                            .Where(t => t.Status != "cancelled")
+                            .Sum(t => t.PriceAtPurchase); // Không cần (decimal?) nếu PriceAtPurchase là decimal
+                        AppUtils.WriteLine($"[EF Core] Calculated TicketRevenue: {stats.TicketRevenue}");
 
-                    stats.TotalOrderSumRevenue = validOrders
-                        .Sum(o => (decimal?)o.TotalAmount) ?? 0;
+                        // Tính toán doanh thu đồ ăn
+                        stats.FoodAndBeverageRevenue = validOrdersList
+                            .SelectMany(o => o.OrderFoodItems) // Giả định OrderModel có ICollection<OrderFoodItemModel> OrderFoodItems
+                            .Sum(ofi => ofi.SubtotalForItem); // Không cần (decimal?) nếu SubtotalForItem là decimal
+                        AppUtils.WriteLine($"[EF Core] Calculated FoodAndBeverageRevenue: {stats.FoodAndBeverageRevenue}");
+
+                        // Tính toán tổng giá trị đơn hàng
+                        stats.TotalOrderSumRevenue = validOrdersList
+                            .Sum(o => o.TotalAmount); // Không cần (decimal?) nếu TotalAmount là decimal
+                        AppUtils.WriteLine($"[EF Core] Calculated TotalOrderSumRevenue: {stats.TotalOrderSumRevenue}");
+                    }
+                    else
+                    {
+                        AppUtils.WriteLine("[EF Core] No valid orders found, revenues will be 0.");
+                        // stats sẽ giữ giá trị 0 mặc định
+                    }
                 }
             }
-            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetRevenueDetailsForPeriod (EF Core): {ex.Message}"); }
+            catch (Exception ex)
+            {
+                AppUtils.WriteLine($"EXCEPTION in GetRevenueDetailsForPeriod (EF Core): {ex.GetType().FullName} - {ex.Message}\nStackTrace: {ex.StackTrace}");
+                // Trả về stats với giá trị 0 nếu có lỗi
+                return new RevenueDetailsStat();
+            }
+            AppUtils.WriteLine($"[EF Core] GetRevenueDetailsForPeriod returning: Ticket={stats.TicketRevenue}, Food={stats.FoodAndBeverageRevenue}, TotalOrderSum={stats.TotalOrderSumRevenue}");
             return stats;
         }
 
