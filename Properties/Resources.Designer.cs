@@ -61,11 +61,11 @@ namespace CinemaApplication.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Server=localhost\SQLEXPRESS01;Database=master;Trusted_Connection=True;.
+        ///   Looks up a localized string similar to Server=DESKTOP-NF8GFOC\SQLEXPRESS;Database=CinemaAppDb;Integrated Security=True;TrustServerCertificate=True;.
         /// </summary>
-        internal static string DB_CON_STRING {
+        internal static string DB_CONNECTION_STRING {
             get {
-                return ResourceManager.GetString("DB_CON_STRING", resourceCulture);
+                return ResourceManager.GetString("DB_CONNECTION_STRING", resourceCulture);
             }
         }
     }
