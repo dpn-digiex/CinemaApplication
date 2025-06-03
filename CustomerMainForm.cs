@@ -1,6 +1,7 @@
 ﻿using CinemaApplication.DataAccess;
 using CinemaApplication.Enums;
 using CinemaApplication.Forms.Common;
+using CinemaApplication.Forms.Customer;
 using CinemaApplication.Utils;
 using System;
 using System.Collections.Generic;
@@ -58,12 +59,9 @@ namespace CinemaApplication
                 case CustomerChildFormEnum.MovieUpcomingForm:
                     childForm = new MovieUpcomingForm(dataAccessLayer);
                     break;
-                //case CustomerChildFormEnum.MyTicketsForm:
-                //    // childForm = new MyTicketsForm();
-                //    break;
-                //case CustomerChildFormEnum.ProfileForm:
-                //    // childForm = new ProfileForm();
-                //    break;
+                case CustomerChildFormEnum.MyTicketForm:
+                     childForm = new MyTicketsForm(dataAccessLayer);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(formType), "Loại form con không được hỗ trợ.");
             }

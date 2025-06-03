@@ -94,36 +94,44 @@ namespace CinemaApplication.Models
     public class OrderModel
     {
         public int OrderId { get; set; }
-        public int UserId { get; set; } // Foreign Key đến UserModel
+        public int UserId { get; set; }
         public DateTime OrderDateTime { get; set; } = DateTime.UtcNow;
         public decimal SubtotalTickets { get; set; } = 0;
         public decimal SubtotalFood { get; set; } = 0;
-        public int? PromotionId { get; set; } // Foreign Key đến PromotionModel, có thể null
+        public int? PromotionId { get; set; }
         public decimal DiscountAmount { get; set; } = 0;
         public decimal AmountBeforeVat { get; set; } = 0;
-        public decimal VatPercentage { get; set; } = 8.00m; // Ví dụ 8% VAT
+        public decimal VatPercentage { get; set; } = 8.00m;
         public decimal VatAmount { get; set; } = 0;
         public decimal TotalAmount { get; set; } = 0;
-        public string Status { get; set; } // Ví dụ: 'pending_payment', 'paid', 'cancelled'
+        public string Status { get; set; }
         public string PaymentMethod { get; set; }
         public string PaymentTransactionId { get; set; }
         public string Notes { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        // --- Navigation Properties ---
+        public virtual UserModel User { get; set; }
+        public virtual PromotionModel Promotion { get; set; } // Tham chiếu đến Khuyến mãi đã áp dụng (nếu có)
+        public virtual ICollection<TicketModel> Tickets { get; set; } = new List<TicketModel>();
+        public virtual ICollection<OrderFoodItemModel> OrderFoodItems { get; set; } = new List<OrderFoodItemModel>(); // MỘT Order có NHIỀU OrderFoodItem
     }
 
     public class TicketModel
     {
         public int TicketId { get; set; }
-        public int OrderId { get; set; } // Foreign Key đến OrderModel
-        public int ShowtimeId { get; set; } // Foreign Key đến ShowtimeModel
-        public int SeatId { get; set; } // Foreign Key đến SeatModel
+        public int OrderId { get; set; }        // Foreign Key
+        public int ShowtimeId { get; set; }     // Foreign Key
+        public int SeatId { get; set; }         // Foreign Key
         public decimal PriceAtPurchase { get; set; }
-        public string TicketCode { get; set; } // Mã vé duy nhất (ví dụ cho QR code)
-        public string Status { get; set; } // Ví dụ: 'booked', 'cancelled', 'checked_in'
+        public string TicketCode { get; set; }
+        public string Status { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public virtual OrderModel Order { get; set; }
+        public virtual ShowtimeModel Showtime { get; set; }
+        public virtual SeatModel Seat { get; set; }
     }
 
     public class FoodItemModel
@@ -141,14 +149,17 @@ namespace CinemaApplication.Models
 
     public class OrderFoodItemModel
     {
-        public int OrderFoodItemId { get; set; } // Khóa chính của bảng này
-        public int OrderId { get; set; } // Foreign Key đến OrderModel
-        public int FoodItemId { get; set; } // Foreign Key đến FoodItemModel
+        public int OrderFoodItemId { get; set; }
+        public int OrderId { get; set; }      // Khóa ngoại
+        public int FoodItemId { get; set; }   // Khóa ngoại
         public int Quantity { get; set; } = 1;
-        public decimal PricePerItemAtPurchase { get; set; } 
+        public decimal PricePerItemAtPurchase { get; set; }
         public decimal SubtotalForItem { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // --- Navigation Properties ---
+        public virtual OrderModel Order { get; set; }         // MỘT OrderFoodItem thuộc về MỘT Order
+        public virtual FoodItemModel FoodItem { get; set; }   // MỘT OrderFoodItem tương ứng với MỘT FoodItem
     }
 
     public class PromotionModel
@@ -241,6 +252,64 @@ namespace CinemaApplication.Models
             SeatCodes = new List<string>();
             TicketCodes = new List<string>();
             FoodItemsSummary = new List<string>();
+        }
+        public class BookedTicketInfoModel
+        {
+            public int STT { get; set; }
+            public int TicketId { get; set; }
+            public string TicketCode { get; set; }
+            public string MovieTitle { get; set; }
+            public DateTime ShowtimeStartTime { get; set; }
+            public string RoomName { get; set; }
+            public string SeatLocation { get; set; } // Ví dụ: "A1", "B5"
+            public decimal PricePaid { get; set; }
+            public DateTime OrderDate { get; set; }
+            public string TicketStatus { get; set; } 
+        }
+        // DTO cho thống kê loại ghế
+        public class SeatTypeStat
+        {
+            public string SeatTypeName { get; set; }
+            public int Count { get; set; }
+            public string DisplayColorHex { get; set; } 
+        }
+
+        // DTO cho thống kê trạng thái phim
+        public class MovieStatusStat
+        {
+            public string Status { get; set; }
+            public int Count { get; set; }
+        }
+
+        // DTO cho thống kê doanh thu chi tiết
+        public class RevenueDetailsStat
+        {
+            public decimal TicketRevenue { get; set; }
+            public decimal FoodAndBeverageRevenue { get; set; }
+            public decimal TotalOrderSumRevenue { get; set; } // Tổng giá trị các đơn hàng (SUM(Orders.total_amount))
+        }
+
+        // DTO cho sản phẩm đồ ăn/thức uống phổ biến
+        public class PopularFoodItemStat
+        {
+            public string FoodItemName { get; set; }
+            public int TotalQuantitySold { get; set; }
+        }
+
+        // DTO cho thống kê số lượng vé theo loại ghế
+        public class SeatTypeSalesStat // Có thể đổi tên từ SeatTypeStat nếu ý nghĩa khác
+        {
+            public string SeatTypeName { get; set; }
+            public int TicketsSold { get; set; }
+            // public string DisplayColorHex { get; set; } // Tùy chọn
+        }
+
+        // DTO cho thống kê số lượng vé theo phim
+        public class MovieSalesStat
+        {
+            public string MovieTitle { get; set; }
+            public int TicketsSold { get; set; }
+            // public decimal RevenueFromMovie { get; set; } // Tùy chọn: có thể tính thêm doanh thu từ phim này
         }
     }
 }

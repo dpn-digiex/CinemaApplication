@@ -46,7 +46,8 @@ namespace CinemaApplication.Enums
         ManageMovieForm,
         ManageFoodForm,
         AddMovieShowtimeForm,
-        ShowtimesMovieForm
+        ShowtimesMovieForm,
+        StatisticalForm
         // more forms...
     }
     public enum SeatTypeEnum

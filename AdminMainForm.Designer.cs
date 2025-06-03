@@ -46,12 +46,9 @@
             showtimesMovieMenuItem = new ToolStripMenuItem();
             addMovieShowtimeMenuItem = new ToolStripMenuItem();
             manageFoodMenuItem = new ToolStripMenuItem();
-            managePromotionMenuItem = new ToolStripMenuItem();
             manageOrderMenuItem = new ToolStripMenuItem();
             manageUserMenuItem = new ToolStripMenuItem();
             statisticalMenuItem = new ToolStripMenuItem();
-            revenueMenuItem = new ToolStripMenuItem();
-            statisticalGeneralMenuItem = new ToolStripMenuItem();
             viewMenuItem = new ToolStripMenuItem();
             scheduleMovieMenuItem = new ToolStripMenuItem();
             movieShowingMenuItem = new ToolStripMenuItem();
@@ -101,26 +98,26 @@
             // accountMenuItem
             // 
             accountMenuItem.Name = "accountMenuItem";
-            accountMenuItem.Size = new Size(224, 26);
+            accountMenuItem.Size = new Size(160, 26);
             accountMenuItem.Text = "Tài khoản";
             // 
             // logoutMenuItem
             // 
             logoutMenuItem.Name = "logoutMenuItem";
-            logoutMenuItem.Size = new Size(224, 26);
+            logoutMenuItem.Size = new Size(160, 26);
             logoutMenuItem.Text = "Đăng xuất";
             logoutMenuItem.Click += logoutMenuItem_Click;
             // 
             // exitMenuItem
             // 
             exitMenuItem.Name = "exitMenuItem";
-            exitMenuItem.Size = new Size(224, 26);
+            exitMenuItem.Size = new Size(160, 26);
             exitMenuItem.Text = "Thoát";
             exitMenuItem.Click += exitMenuItem_Click;
             // 
             // managementMenuItem
             // 
-            managementMenuItem.DropDownItems.AddRange(new ToolStripItem[] { manageRoomMenuItem, manageMovieMenuItem, mangeScheduleMenuItem, manageFoodMenuItem, managePromotionMenuItem, manageOrderMenuItem, manageUserMenuItem });
+            managementMenuItem.DropDownItems.AddRange(new ToolStripItem[] { manageRoomMenuItem, manageMovieMenuItem, mangeScheduleMenuItem, manageFoodMenuItem, manageOrderMenuItem, manageUserMenuItem });
             managementMenuItem.Name = "managementMenuItem";
             managementMenuItem.Size = new Size(73, 24);
             managementMenuItem.Text = "Quản lý";
@@ -129,7 +126,7 @@
             // 
             manageRoomMenuItem.DropDownItems.AddRange(new ToolStripItem[] { listRoomMenuItem, seatTypeMenuItem, addMovieRoomMenuItem });
             manageRoomMenuItem.Name = "manageRoomMenuItem";
-            manageRoomMenuItem.Size = new Size(223, 26);
+            manageRoomMenuItem.Size = new Size(224, 26);
             manageRoomMenuItem.Text = "Rạp và phòng chiếu";
             // 
             // listRoomMenuItem
@@ -156,7 +153,7 @@
             // 
             manageMovieMenuItem.DropDownItems.AddRange(new ToolStripItem[] { listMovieMenuItem });
             manageMovieMenuItem.Name = "manageMovieMenuItem";
-            manageMovieMenuItem.Size = new Size(223, 26);
+            manageMovieMenuItem.Size = new Size(224, 26);
             manageMovieMenuItem.Text = "Phim ảnh";
             // 
             // listMovieMenuItem
@@ -170,7 +167,7 @@
             // 
             mangeScheduleMenuItem.DropDownItems.AddRange(new ToolStripItem[] { showtimesMovieMenuItem, addMovieShowtimeMenuItem });
             mangeScheduleMenuItem.Name = "mangeScheduleMenuItem";
-            mangeScheduleMenuItem.Size = new Size(223, 26);
+            mangeScheduleMenuItem.Size = new Size(224, 26);
             mangeScheduleMenuItem.Text = "Lịch chiếu";
             // 
             // showtimesMovieMenuItem
@@ -190,46 +187,28 @@
             // manageFoodMenuItem
             // 
             manageFoodMenuItem.Name = "manageFoodMenuItem";
-            manageFoodMenuItem.Size = new Size(223, 26);
+            manageFoodMenuItem.Size = new Size(224, 26);
             manageFoodMenuItem.Text = "Thức ăn, đồ uống";
             manageFoodMenuItem.Click += manageFoodMenuItem_Click;
-            // 
-            // managePromotionMenuItem
-            // 
-            managePromotionMenuItem.Name = "managePromotionMenuItem";
-            managePromotionMenuItem.Size = new Size(223, 26);
-            managePromotionMenuItem.Text = "Khuyến mãi";
             // 
             // manageOrderMenuItem
             // 
             manageOrderMenuItem.Name = "manageOrderMenuItem";
-            manageOrderMenuItem.Size = new Size(223, 26);
+            manageOrderMenuItem.Size = new Size(224, 26);
             manageOrderMenuItem.Text = "Đơn hàng, đặt vé";
             // 
             // manageUserMenuItem
             // 
             manageUserMenuItem.Name = "manageUserMenuItem";
-            manageUserMenuItem.Size = new Size(223, 26);
+            manageUserMenuItem.Size = new Size(224, 26);
             manageUserMenuItem.Text = "Người dùng";
             // 
             // statisticalMenuItem
             // 
-            statisticalMenuItem.DropDownItems.AddRange(new ToolStripItem[] { revenueMenuItem, statisticalGeneralMenuItem });
             statisticalMenuItem.Name = "statisticalMenuItem";
             statisticalMenuItem.Size = new Size(139, 24);
             statisticalMenuItem.Text = "Báo cáo thống kê";
-            // 
-            // revenueMenuItem
-            // 
-            revenueMenuItem.Name = "revenueMenuItem";
-            revenueMenuItem.Size = new Size(222, 26);
-            revenueMenuItem.Text = "Doanh thu";
-            // 
-            // statisticalGeneralMenuItem
-            // 
-            statisticalGeneralMenuItem.Name = "statisticalGeneralMenuItem";
-            statisticalGeneralMenuItem.Size = new Size(222, 26);
-            statisticalGeneralMenuItem.Text = "Thống kê tổng quát";
+            statisticalMenuItem.Click += statisticalMenuItem_Click;
             // 
             // viewMenuItem
             // 
@@ -311,12 +290,9 @@
         private ToolStripMenuItem showtimesMovieMenuItem;
         private ToolStripMenuItem addMovieShowtimeMenuItem;
         private ToolStripMenuItem manageFoodMenuItem;
-        private ToolStripMenuItem managePromotionMenuItem;
         private ToolStripMenuItem manageOrderMenuItem;
         private ToolStripMenuItem manageUserMenuItem;
         private ToolStripMenuItem statisticalMenuItem;
-        private ToolStripMenuItem revenueMenuItem;
-        private ToolStripMenuItem statisticalGeneralMenuItem;
         private ToolStripMenuItem viewMenuItem;
         private ToolStripMenuItem scheduleMovieMenuItem;
         private ToolStripMenuItem movieShowingMenuItem;

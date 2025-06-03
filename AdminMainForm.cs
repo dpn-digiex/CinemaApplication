@@ -94,6 +94,9 @@ namespace CinemaApplication
                 case AdminChildFormEnum.ShowtimesMovieForm:
                     childForm = new ShowtimesMovieForm(dataAccessLayer);
                     break;
+                case AdminChildFormEnum.StatisticalForm:
+                    childForm = new StatisticalForm(dataAccessLayer);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(formType), "Loại form con không được hỗ trợ.");
             }
@@ -193,6 +196,11 @@ namespace CinemaApplication
                 loginForm.Show();
                 this.Close();
             }
+        }
+
+        private void statisticalMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenChildForm(AdminChildFormEnum.StatisticalForm);
         }
     }
 }

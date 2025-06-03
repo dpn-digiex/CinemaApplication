@@ -3,6 +3,7 @@ using CinemaApplication.Interfaces;
 using CinemaApplication.Models;
 using CinemaApplication.Utils;
 using Microsoft.VisualBasic.ApplicationServices;
+using static CinemaApplication.Models.OrderConfirmationModel;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
@@ -225,6 +226,41 @@ namespace CinemaApplication.DataAccess
         public OrderConfirmationModel CreateFullOrder(UserModel currentUser, ShowtimeBookingInfoModel selectedShowtime, List<SeatModel> selectedSeats, List<OrderFoodItemData> selectedFoodItems, List<SeatTypeModel> allSeatTypes)
         {
             return _dataAccessor.CreateFullOrder(currentUser, selectedShowtime, selectedSeats, selectedFoodItems, allSeatTypes);
+        }
+
+        public List<BookedTicketInfoModel> GetTicketsByUserId(int userId)
+        {
+            return _dataAccessor.GetTicketsByUserId(userId);
+        }
+        public int GetTotalRoomCount() => _dataAccessor.GetTotalRoomCount();
+        public int GetTotalActiveSeatCount() => _dataAccessor.GetTotalActiveSeatCount();
+        public List<SeatTypeStat> GetSeatCountByType() => _dataAccessor.GetSeatCountByType();
+        public List<MovieStatusStat> GetMovieCountByStatus() => _dataAccessor.GetMovieCountByStatus();
+        public decimal GetTotalTicketRevenueForPeriod(DateTime startDate, DateTime endDate) => _dataAccessor.GetTotalTicketRevenueForPeriod(startDate, endDate);
+
+        public RevenueDetailsStat GetRevenueDetailsForPeriod(DateTime startDate, DateTime endDate)
+        {
+            return _dataAccessor.GetRevenueDetailsForPeriod(startDate, endDate);
+        }
+
+        public List<PopularFoodItemStat> GetMostPopularFoodItems(DateTime startDate, DateTime endDate, int topN)
+        {
+            return _dataAccessor.GetMostPopularFoodItems(startDate, endDate, topN);
+        }
+
+        public List<SeatTypeSalesStat> GetTicketSalesBySeatType(DateTime startDate, DateTime endDate)
+        {
+            return _dataAccessor.GetTicketSalesBySeatType(startDate, endDate);
+        }
+
+        public int GetTotalTicketsSoldForPeriod(DateTime startDate, DateTime endDate)
+        {
+            return _dataAccessor.GetTotalTicketsSoldForPeriod(startDate, endDate);
+        }
+
+        public List<MovieSalesStat> GetTicketSalesByMovie(DateTime startDate, DateTime endDate)
+        {
+            return _dataAccessor.GetTicketSalesByMovie(startDate, endDate);
         }
     }
 }

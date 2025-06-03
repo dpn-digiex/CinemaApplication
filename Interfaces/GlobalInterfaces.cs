@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static CinemaApplication.Models.OrderConfirmationModel;
 
 namespace CinemaApplication.Interfaces
 {
@@ -44,5 +45,16 @@ namespace CinemaApplication.Interfaces
             List<OrderFoodItemData> selectedFoodItems,
             List<SeatTypeModel> allSeatTypes
         );
+        List<BookedTicketInfoModel> GetTicketsByUserId(int userId);
+        int GetTotalRoomCount();
+        int GetTotalActiveSeatCount();
+        List<SeatTypeStat> GetSeatCountByType();
+        List<MovieStatusStat> GetMovieCountByStatus();
+        decimal GetTotalTicketRevenueForPeriod(DateTime startDate, DateTime endDate);
+        RevenueDetailsStat GetRevenueDetailsForPeriod(DateTime startDate, DateTime endDate);
+        List<PopularFoodItemStat> GetMostPopularFoodItems(DateTime startDate, DateTime endDate, int topN);
+        List<SeatTypeSalesStat> GetTicketSalesBySeatType(DateTime startDate, DateTime endDate);
+        int GetTotalTicketsSoldForPeriod(DateTime startDate, DateTime endDate);
+        List<MovieSalesStat> GetTicketSalesByMovie(DateTime startDate, DateTime endDate);
     }
 }

@@ -5,6 +5,7 @@ using CinemaApplication.Utils;
 using Microsoft.Data.SqlClient;
 using System.Collections.Generic;
 using System.Data;
+using static CinemaApplication.Models.OrderConfirmationModel;
 
 namespace CinemaApplication.DataAccess
 {
@@ -1265,6 +1266,417 @@ namespace CinemaApplication.DataAccess
                 return null;
             }
             return confirmation;
+        }
+
+        public List<BookedTicketInfoModel> GetTicketsByUserId(int userId)
+        {
+            List<BookedTicketInfoModel> tickets = new List<BookedTicketInfoModel>();
+            AppUtils.WriteLine($"[ADO.NET] Getting tickets for UserID: {userId}");
+            int sttCounter = 1;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    string query = @"
+                        SELECT
+                            t.ticket_id, t.ticket_code, t.price_at_purchase, t.status AS ticket_status,
+                            o.order_datetime,
+                            s.start_time AS showtime_start_time,
+                            m.title AS movie_title,
+                            cr.room_name,
+                            se.row_identifier, se.seat_number_in_row
+                        FROM Tickets t
+                        JOIN Orders o ON t.order_id = o.order_id
+                        JOIN Showtimes s ON t.showtime_id = s.showtime_id
+                        JOIN Movies m ON s.movie_id = m.movie_id
+                        JOIN CinemaRooms cr ON s.room_id = cr.room_id
+                        JOIN Seats se ON t.seat_id = se.seat_id
+                        WHERE o.user_id = @UserId
+                        ORDER BY o.order_datetime DESC, s.start_time DESC;
+                    ";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@UserId", userId);
+                        connection.Open();
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                tickets.Add(new BookedTicketInfoModel
+                                {
+                                    STT = sttCounter++,
+                                    TicketId = Convert.ToInt32(reader["ticket_id"]),
+                                    TicketCode = reader["ticket_code"] != DBNull.Value ? reader["ticket_code"].ToString() : "N/A",
+                                    PricePaid = Convert.ToDecimal(reader["price_at_purchase"]),
+                                    TicketStatus = reader["ticket_status"].ToString(),
+                                    OrderDate = Convert.ToDateTime(reader["order_datetime"]),
+                                    ShowtimeStartTime = Convert.ToDateTime(reader["showtime_start_time"]),
+                                    MovieTitle = reader["movie_title"].ToString(),
+                                    RoomName = reader["room_name"].ToString(),
+                                    SeatLocation = $"{reader["row_identifier"]}{reader["seat_number_in_row"]}"
+                                });
+                            }
+                        }
+                    }
+                }
+                AppUtils.WriteLine($"[ADO.NET] Found {tickets.Count} tickets for UserID: {userId}.");
+            }
+            catch (Exception ex)
+            {
+                AppUtils.WriteLine($"EXCEPTION in GetTicketsByUserId (ADO.NET): {ex.Message}\nStackTrace: {ex.StackTrace}");
+            }
+            return tickets;
+        }
+        public int GetTotalRoomCount()
+        {
+            AppUtils.WriteLine("[ADO.NET] Getting total room count.");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT COUNT(*) FROM CinemaRooms WHERE status = 'active';"; // Chỉ đếm phòng active
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        connection.Open();
+                        return (int?)command.ExecuteScalar() ?? 0;
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalRoomCount (ADO.NET): {ex.Message}"); return 0; }
+        }
+
+        public int GetTotalActiveSeatCount()
+        {
+            AppUtils.WriteLine("[ADO.NET] Getting total active seat count.");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    // Chỉ đếm ghế active trong các phòng active
+                    string query = @"SELECT COUNT(s.seat_id) FROM Seats s
+                                     JOIN CinemaRooms cr ON s.room_id = cr.room_id
+                                     WHERE s.is_active = 1 AND cr.status = 'active';";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        connection.Open();
+                        return (int?)command.ExecuteScalar() ?? 0;
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalActiveSeatCount (ADO.NET): {ex.Message}"); return 0; }
+        }
+
+        public List<SeatTypeStat> GetSeatCountByType()
+        {
+            var stats = new List<SeatTypeStat>();
+            AppUtils.WriteLine("[ADO.NET] Getting seat count by type.");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    // Đếm ghế active theo từng loại, trong các phòng active
+                    string query = @"
+                        SELECT st.type_name, st.display_color_hex, COUNT(s.seat_id) AS SeatCount
+                        FROM SeatTypes st
+                        JOIN Seats s ON st.seat_type_id = s.seat_type_id
+                        JOIN CinemaRooms cr ON s.room_id = cr.room_id
+                        WHERE s.is_active = 1 AND cr.status = 'active'
+                        GROUP BY st.type_name, st.display_color_hex
+                        ORDER BY st.type_name;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        connection.Open();
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                stats.Add(new SeatTypeStat
+                                {
+                                    SeatTypeName = reader["type_name"].ToString(),
+                                    Count = Convert.ToInt32(reader["SeatCount"]),
+                                    DisplayColorHex = reader["display_color_hex"] != DBNull.Value ? reader["display_color_hex"].ToString() : null
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetSeatCountByType (ADO.NET): {ex.Message}"); }
+            return stats;
+        }
+
+        public List<MovieStatusStat> GetMovieCountByStatus()
+        {
+            var stats = new List<MovieStatusStat>();
+            AppUtils.WriteLine("[ADO.NET] Getting movie count by status.");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    string query = "SELECT status, COUNT(movie_id) AS MovieCount FROM Movies GROUP BY status ORDER BY status;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        connection.Open();
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                stats.Add(new MovieStatusStat
+                                {
+                                    Status = reader["status"].ToString(),
+                                    Count = Convert.ToInt32(reader["MovieCount"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetMovieCountByStatus (ADO.NET): {ex.Message}"); }
+            return stats;
+        }
+
+        public decimal GetTotalTicketRevenueForPeriod(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[ADO.NET] Getting total ticket revenue from {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}.");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    // Chỉ tính doanh thu từ vé có status 'booked' hoặc 'checked_in' (không phải 'cancelled')
+                    // và đơn hàng có status 'paid' hoặc 'completed'
+                    string query = @"
+                        SELECT SUM(t.price_at_purchase) 
+                        FROM Tickets t
+                        JOIN Orders o ON t.order_id = o.order_id
+                        WHERE t.status IN ('booked', 'checked_in') 
+                          AND o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDate.Date.AddDays(1)); // Để bao gồm cả ngày endDate
+                        connection.Open();
+                        object result = command.ExecuteScalar();
+                        return result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalTicketRevenueForPeriod (ADO.NET): {ex.Message}"); return 0; }
+        }
+        public RevenueDetailsStat GetRevenueDetailsForPeriod(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[ADO.NET] Getting revenue details for period: {startDate:d} - {endDate:d}");
+            RevenueDetailsStat stats = new RevenueDetailsStat();
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    // Doanh thu vé
+                    string ticketQuery = @"
+                        SELECT SUM(t.price_at_purchase) 
+                        FROM Tickets t
+                        JOIN Orders o ON t.order_id = o.order_id
+                        WHERE t.status NOT IN ('cancelled') 
+                          AND o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne;";
+                    using (var command = new SqlCommand(ticketQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        object result = command.ExecuteScalar();
+                        stats.TicketRevenue = result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                    }
+
+                    // Doanh thu đồ ăn
+                    string foodQuery = @"
+                        SELECT SUM(ofi.subtotal_for_item) 
+                        FROM OrderFoodItems ofi
+                        JOIN Orders o ON ofi.order_id = o.order_id
+                        WHERE o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne;";
+                    using (var command = new SqlCommand(foodQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        object result = command.ExecuteScalar();
+                        stats.FoodAndBeverageRevenue = result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                    }
+
+                    // Tổng doanh thu từ bảng Orders (SUM(total_amount))
+                    string orderSumQuery = @"
+                        SELECT SUM(o.total_amount) 
+                        FROM Orders o
+                        WHERE o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne;";
+                    using (var command = new SqlCommand(orderSumQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        object result = command.ExecuteScalar();
+                        stats.TotalOrderSumRevenue = result != DBNull.Value && result != null ? Convert.ToDecimal(result) : 0;
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetRevenueDetailsForPeriod (ADO.NET): {ex.Message}"); }
+            return stats;
+        }
+
+        public List<PopularFoodItemStat> GetMostPopularFoodItems(DateTime startDate, DateTime endDate, int topN)
+        {
+            var stats = new List<PopularFoodItemStat>();
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            AppUtils.WriteLine($"[ADO.NET] Getting Top {topN} popular food items for period: {startDate:d} - {endDate:d}");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    string query = $@"
+                        SELECT TOP (@TopN) fi.name AS FoodItemName, SUM(ofi.quantity) AS TotalQuantitySold
+                        FROM OrderFoodItems ofi
+                        JOIN FoodItems fi ON ofi.food_item_id = fi.food_item_id
+                        JOIN Orders o ON ofi.order_id = o.order_id
+                        WHERE o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne
+                        GROUP BY fi.name
+                        ORDER BY TotalQuantitySold DESC, fi.name ASC;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@TopN", topN);
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        connection.Open();
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                stats.Add(new PopularFoodItemStat
+                                {
+                                    FoodItemName = reader["FoodItemName"].ToString(),
+                                    TotalQuantitySold = Convert.ToInt32(reader["TotalQuantitySold"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetMostPopularFoodItems (ADO.NET): {ex.Message}"); }
+            return stats;
+        }
+
+        public List<SeatTypeSalesStat> GetTicketSalesBySeatType(DateTime startDate, DateTime endDate)
+        {
+            var stats = new List<SeatTypeSalesStat>();
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            AppUtils.WriteLine($"[ADO.NET] Getting ticket sales by seat type for period: {startDate:d} - {endDate:d}");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    string query = @"
+                        SELECT st.type_name AS SeatTypeName, COUNT(t.ticket_id) AS TicketsSold
+                        FROM Tickets t
+                        JOIN Seats s ON t.seat_id = s.seat_id
+                        JOIN SeatTypes st ON s.seat_type_id = st.seat_type_id
+                        JOIN Orders o ON t.order_id = o.order_id
+                        WHERE t.status NOT IN ('cancelled')
+                          AND o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne
+                        GROUP BY st.type_name
+                        ORDER BY TicketsSold DESC, st.type_name ASC;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        connection.Open();
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                stats.Add(new SeatTypeSalesStat
+                                {
+                                    SeatTypeName = reader["SeatTypeName"].ToString(),
+                                    TicketsSold = Convert.ToInt32(reader["TicketsSold"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTicketSalesBySeatType (ADO.NET): {ex.Message}"); }
+            return stats;
+        }
+
+        public int GetTotalTicketsSoldForPeriod(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[ADO.NET] Getting total tickets sold for period: {startDate:d} - {endDate:d}");
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    string query = @"
+                        SELECT COUNT(t.ticket_id) 
+                        FROM Tickets t
+                        JOIN Orders o ON t.order_id = o.order_id
+                        WHERE t.status NOT IN ('cancelled')
+                          AND o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        connection.Open();
+                        object result = command.ExecuteScalar();
+                        return result != DBNull.Value && result != null ? Convert.ToInt32(result) : 0;
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalTicketsSoldForPeriod (ADO.NET): {ex.Message}"); return 0; }
+        }
+
+        public List<MovieSalesStat> GetTicketSalesByMovie(DateTime startDate, DateTime endDate)
+        {
+            var stats = new List<MovieSalesStat>();
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            AppUtils.WriteLine($"[ADO.NET] Getting ticket sales by movie for period: {startDate:d} - {endDate:d}");
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    string query = @"
+                        SELECT m.title AS MovieTitle, COUNT(t.ticket_id) AS TicketsSold
+                        FROM Tickets t
+                        JOIN Showtimes sh ON t.showtime_id = sh.showtime_id
+                        JOIN Movies m ON sh.movie_id = m.movie_id
+                        JOIN Orders o ON t.order_id = o.order_id
+                        WHERE t.status NOT IN ('cancelled')
+                          AND o.status IN ('paid', 'completed')
+                          AND o.order_datetime >= @StartDate AND o.order_datetime < @EndDatePlusOne
+                        GROUP BY m.title
+                        ORDER BY TicketsSold DESC, m.title ASC;";
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@StartDate", startDate.Date);
+                        command.Parameters.AddWithValue("@EndDatePlusOne", endDatePlusOne);
+                        connection.Open();
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                stats.Add(new MovieSalesStat
+                                {
+                                    MovieTitle = reader["MovieTitle"].ToString(),
+                                    TicketsSold = Convert.ToInt32(reader["TicketsSold"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTicketSalesByMovie (ADO.NET): {ex.Message}"); }
+            return stats;
         }
     }
 }

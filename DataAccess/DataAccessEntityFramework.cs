@@ -2,6 +2,7 @@
 using CinemaApplication.Models;
 using CinemaApplication.Utils;
 using Microsoft.EntityFrameworkCore;
+using static CinemaApplication.Models.OrderConfirmationModel;
 
 namespace CinemaApplication.DataAccess
 {
@@ -744,6 +745,269 @@ namespace CinemaApplication.DataAccess
                 }
             }
             return confirmation;
+        }
+        public List<BookedTicketInfoModel> GetTicketsByUserId(int userId)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting tickets for UserID: {userId}");
+            List<BookedTicketInfoModel> tickets = new List<BookedTicketInfoModel>();
+            int sttCounter = 1;
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    tickets = context.Tickets
+                        .Where(t => t.Order.UserId == userId) // Giả định Ticket có Order, Order có UserId
+                        .Include(t => t.Order)
+                        .Include(t => t.Showtime)
+                            .ThenInclude(sh => sh.Movie)
+                        .Include(t => t.Showtime)
+                            .ThenInclude(sh => sh.CinemaRoom)
+                        .Include(t => t.Seat)
+                        .OrderByDescending(t => t.Order.OrderDateTime)
+                        .ThenByDescending(t => t.Showtime.StartTime)
+                        .Select(t => new BookedTicketInfoModel
+                        {
+                            // STT sẽ được gán sau khi ToList()
+                            TicketId = t.TicketId,
+                            TicketCode = t.TicketCode ?? "N/A",
+                            PricePaid = t.PriceAtPurchase,
+                            TicketStatus = t.Status,
+                            OrderDate = t.Order.OrderDateTime,
+                            ShowtimeStartTime = t.Showtime.StartTime,
+                            MovieTitle = t.Showtime.Movie.Title,
+                            RoomName = t.Showtime.CinemaRoom.RoomName,
+                            SeatLocation = t.Seat.RowIdentifier + t.Seat.SeatNumberInRow
+                        })
+                        .AsNoTracking()
+                        .ToList();
+
+                    // Gán STT sau khi đã lấy và sắp xếp dữ liệu
+                    for (int i = 0; i < tickets.Count; i++)
+                    {
+                        tickets[i].STT = i + 1;
+                    }
+                }
+                AppUtils.WriteLine($"[EF Core] Found {tickets.Count} tickets for UserID: {userId}.");
+            }
+            catch (Exception ex)
+            {
+                AppUtils.WriteLine($"EXCEPTION in GetTicketsByUserId (EF Core): {ex.Message}\nStackTrace: {ex.StackTrace}");
+            }
+            return tickets;
+        }
+        public int GetTotalRoomCount()
+        {
+            AppUtils.WriteLine("[EF Core] Getting total room count.");
+            try { using (var context = CreateContext()) return context.CinemaRooms.Count(r => r.Status == "active"); }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalRoomCount (EF Core): {ex.Message}"); return 0; }
+        }
+
+        public int GetTotalActiveSeatCount()
+        {
+            AppUtils.WriteLine("[EF Core] Getting total active seat count.");
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.Seats
+                                  .Where(s => s.IsActive && s.CinemaRoom.Status == "active") // Giả định SeatModel có nav prop CinemaRoom
+                                  .Count();
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalActiveSeatCount (EF Core): {ex.Message}"); return 0; }
+        }
+
+        public List<SeatTypeStat> GetSeatCountByType()
+        {
+            AppUtils.WriteLine("[EF Core] Getting seat count by type.");
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.Seats
+                                  .Where(s => s.IsActive && s.CinemaRoom.Status == "active") // Chỉ ghế active trong phòng active
+                                  .Include(s => s.SeatType) // Nạp thông tin SeatType
+                                  .GroupBy(s => new { s.SeatType.SeatTypeId, s.SeatType.TypeName, s.SeatType.DisplayColorHex })
+                                  .Select(g => new SeatTypeStat
+                                  {
+                                      SeatTypeName = g.Key.TypeName,
+                                      Count = g.Count(),
+                                      DisplayColorHex = g.Key.DisplayColorHex
+                                  })
+                                  .OrderBy(s => s.SeatTypeName)
+                                  .ToList();
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetSeatCountByType (EF Core): {ex.Message}"); return new List<SeatTypeStat>(); }
+        }
+
+        public List<MovieStatusStat> GetMovieCountByStatus()
+        {
+            AppUtils.WriteLine("[EF Core] Getting movie count by status.");
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.Movies
+                                  .GroupBy(m => m.Status)
+                                  .Select(g => new MovieStatusStat
+                                  {
+                                      Status = g.Key,
+                                      Count = g.Count()
+                                  })
+                                  .OrderBy(s => s.Status)
+                                  .ToList();
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetMovieCountByStatus (EF Core): {ex.Message}"); return new List<MovieStatusStat>(); }
+        }
+
+        public decimal GetTotalTicketRevenueForPeriod(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting total ticket revenue from {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}.");
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    DateTime endDatePlusOne = endDate.Date.AddDays(1);
+                    return context.Tickets
+                                  .Where(t => (t.Status == "booked" || t.Status == "checked_in") &&
+                                              (t.Order.Status == "paid" || t.Order.Status == "completed") && // Giả định Ticket có nav prop Order
+                                              t.Order.OrderDateTime >= startDate.Date && t.Order.OrderDateTime < endDatePlusOne)
+                                  .Sum(t => t.PriceAtPurchase);
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalTicketRevenueForPeriod (EF Core): {ex.Message}"); return 0; }
+        }
+
+        public RevenueDetailsStat GetRevenueDetailsForPeriod(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting revenue details for period: {startDate:d} - {endDate:d}");
+            var stats = new RevenueDetailsStat();
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    var validOrders = context.Orders
+                        .Where(o => (o.Status == "paid" || o.Status == "completed") &&
+                                    o.OrderDateTime >= startDate.Date && o.OrderDateTime < endDatePlusOne);
+
+                    stats.TicketRevenue = validOrders
+                        .SelectMany(o => o.Tickets) // Giả định OrderModel có ICollection<TicketModel> Tickets
+                        .Where(t => t.Status != "cancelled")
+                        .Sum(t => (decimal?)t.PriceAtPurchase) ?? 0; // Sum có thể trả về null nếu không có item
+
+                    stats.FoodAndBeverageRevenue = validOrders
+                        .SelectMany(o => o.OrderFoodItems) // Giả định OrderModel có ICollection<OrderFoodItemModel> OrderFoodItems
+                        .Sum(ofi => (decimal?)ofi.SubtotalForItem) ?? 0;
+
+                    stats.TotalOrderSumRevenue = validOrders
+                        .Sum(o => (decimal?)o.TotalAmount) ?? 0;
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetRevenueDetailsForPeriod (EF Core): {ex.Message}"); }
+            return stats;
+        }
+
+        public List<PopularFoodItemStat> GetMostPopularFoodItems(DateTime startDate, DateTime endDate, int topN)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting Top {topN} popular food items for period: {startDate:d} - {endDate:d}");
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.OrderFoodItems
+                        .Where(ofi => (ofi.Order.Status == "paid" || ofi.Order.Status == "completed") &&
+                                      ofi.Order.OrderDateTime >= startDate.Date && ofi.Order.OrderDateTime < endDatePlusOne)
+                        .Include(ofi => ofi.FoodItem) // Giả định OrderFoodItemModel có FoodItemModel FoodItem
+                        .GroupBy(ofi => new { ofi.FoodItemId, ofi.FoodItem.Name })
+                        .Select(g => new PopularFoodItemStat
+                        {
+                            FoodItemName = g.Key.Name,
+                            TotalQuantitySold = g.Sum(x => x.Quantity)
+                        })
+                        .OrderByDescending(x => x.TotalQuantitySold)
+                        .ThenBy(x => x.FoodItemName)
+                        .Take(topN)
+                        .ToList();
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetMostPopularFoodItems (EF Core): {ex.Message}"); return new List<PopularFoodItemStat>(); }
+        }
+
+        public List<SeatTypeSalesStat> GetTicketSalesBySeatType(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting ticket sales by seat type for period: {startDate:d} - {endDate:d}");
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.Tickets
+                        .Where(t => t.Status != "cancelled" &&
+                                    (t.Order.Status == "paid" || t.Order.Status == "completed") &&
+                                    t.Order.OrderDateTime >= startDate.Date && t.Order.OrderDateTime < endDatePlusOne)
+                        .Include(t => t.Seat)
+                            .ThenInclude(s => s.SeatType) // Giả định SeatModel có SeatTypeModel SeatType
+                        .GroupBy(t => new { t.Seat.SeatTypeId, t.Seat.SeatType.TypeName })
+                        .Select(g => new SeatTypeSalesStat
+                        {
+                            SeatTypeName = g.Key.TypeName,
+                            TicketsSold = g.Count()
+                        })
+                        .OrderByDescending(x => x.TicketsSold)
+                        .ThenBy(x => x.SeatTypeName)
+                        .ToList();
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTicketSalesBySeatType (EF Core): {ex.Message}"); return new List<SeatTypeSalesStat>(); }
+        }
+
+        public int GetTotalTicketsSoldForPeriod(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting total tickets sold for period: {startDate:d} - {endDate:d}");
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.Tickets
+                        .Count(t => t.Status != "cancelled" &&
+                                     (t.Order.Status == "paid" || t.Order.Status == "completed") &&
+                                     t.Order.OrderDateTime >= startDate.Date && t.Order.OrderDateTime < endDatePlusOne);
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTotalTicketsSoldForPeriod (EF Core): {ex.Message}"); return 0; }
+        }
+
+        public List<MovieSalesStat> GetTicketSalesByMovie(DateTime startDate, DateTime endDate)
+        {
+            AppUtils.WriteLine($"[EF Core] Getting ticket sales by movie for period: {startDate:d} - {endDate:d}");
+            DateTime endDatePlusOne = endDate.Date.AddDays(1);
+            try
+            {
+                using (var context = CreateContext())
+                {
+                    return context.Tickets
+                        .Where(t => t.Status != "cancelled" &&
+                                    (t.Order.Status == "paid" || t.Order.Status == "completed") &&
+                                    t.Order.OrderDateTime >= startDate.Date && t.Order.OrderDateTime < endDatePlusOne)
+                        .Include(t => t.Showtime)
+                            .ThenInclude(sh => sh.Movie) // Giả định ShowtimeModel có MovieModel Movie
+                        .GroupBy(t => new { t.Showtime.MovieId, t.Showtime.Movie.Title })
+                        .Select(g => new MovieSalesStat
+                        {
+                            MovieTitle = g.Key.Title,
+                            TicketsSold = g.Count()
+                        })
+                        .OrderByDescending(x => x.TicketsSold)
+                        .ThenBy(x => x.MovieTitle)
+                        .ToList();
+                }
+            }
+            catch (Exception ex) { AppUtils.WriteLine($"EXCEPTION in GetTicketSalesByMovie (EF Core): {ex.Message}"); return new List<MovieSalesStat>(); }
         }
     }
 
